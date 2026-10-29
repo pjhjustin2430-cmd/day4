@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jeju Island · three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #bfe3dd; overflow: hidden; font-family: system-ui, "Malgun Gothic", sans-serif; }
+  canvas { display: block; }
+  #intro {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; color: #fff;
+    background: rgba(20, 70, 90, .35); backdrop-filter: blur(3px); text-shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+  #intro h1 { margin: 0; font-size: 44px; letter-spacing: .04em; }
+  #intro p { margin: 0 0 22px; font-size: 16px; opacity: .95; }
+  #start {
+    padding: 12px 34px; font-size: 18px; color: #fff; cursor: pointer;
+    border: 2px solid #fff; border-radius: 999px; background: #ff8a1f;
+    box-shadow: 0 6px 20px rgba(255,138,31,.5); transition: transform .15s;
+  }
+  #start:hover { transform: scale(1.06); }
+  #vpanel {
+    position: fixed; right: 14px; top: 14px; z-index: 6; width: min(270px, 90vw); padding: 10px 14px 12px;
+    background: rgba(255,255,255,.9); border-radius: 14px; color: #17414f; font: 13px/1.45 system-ui, sans-serif;
+    box-shadow: 0 6px 20px rgba(0,0,0,.16); backdrop-filter: blur(6px);
+  }
+  #vpanel.hidden { display: none; }
+  #vpanel .vt { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  #vpanel .vm { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; }
+  #vpanel .vm b { color: #e8590c; font-size: 15px; }
+  #vpanel .vc { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; }
+  #vplay { width: 34px; height: 30px; border: 0; border-radius: 8px; background: #ff8a1f; color: #fff; font-size: 14px; cursor: pointer; flex: none; }
+  #vslider { flex: 1; accent-color: #ff8a1f; }
+  #vpanel .vn { font-size: 11.5px; opacity: .8; }
+  #vpanel .vs { font-size: 10.5px; opacity: .55; margin-top: 3px; }
+  .label.v { background: rgba(255,255,255,.92); border-left: 4px solid var(--c, #ff8a1f); font-size: 12px; font-weight: 700; }
+  #hint {
+    position: fixed; left: 16px; bottom: 12px; color: #1d4a58; z-index: 6;
+    font-size: 13px; line-height: 1.4; pointer-events: none; opacity: .85;
+  }
+  .label {
+    position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none; white-space: nowrap;
+    transform: translate(-50%, -100%); padding: 3px 9px; border-radius: 999px;
+    background: rgba(255,255,255,.85); color: #17414f; font-size: 12px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="intro">
+  <h1>제주도 · Jeju Island</h1>
+  <p>한라산 · 성산일출봉 · 우도 · 돌하르방 · 풍력단지 · 관광지 관람객 데이터</p>
+  <button id="start">▶ 시작</button>
+</div>
+<div id="hint">마우스 드래그: 회전 · 휠: 확대/축소 · 우클릭 드래그: 이동</div>
+
+<div id="vpanel" class="hidden">
+  <div class="vt">📊 서귀포 직영관광지 관람객</div>
+  <div class="vm"><span id="vmonth">–</span><b id="vtotal"></b></div>
+  <div class="vc"><button id="vplay" title="월별로 자동 재생">▶</button><input id="vslider" type="range" min="0" max="0" value="0"></div>
+  <div class="vn">기둥 높이 = 그 달 관람객 · 관광객이 많은 달일수록 배와 비행기가 바빠져요</div>
+  <div class="vs">출처: 공공데이터포털 · 제주특별자치도 서귀포시 「직영관광지 관람객수 추이」</div>
+</div>
+<!-- 관람객 데이터: scripts/update-visitors.mjs 가 공공데이터포털 API 에서 받아 이 자리에 채웁니다 (인증키는 포함되지 않음) -->
+<script type="application/json" id="visitor-data"><!--VISITORS:BEGIN-->{"updated":"2026-10-02","spots":["천지연폭포","정방폭포","천제연폭포","중문대포 주상절리대","산방산_용머리","감귤박물관"],"rows":[["2018-06",127651,75037,52837,113730,35403,8075],["2018-07",118456,64844,48264,91021,20456,8685],["2018-08",138664,84634,52012,102362,16137,10246],["2018-09",123038,72860,48611,72860,26281,9053],["2018-10",136348,76274,54191,142106,52686,10496],["2018-11",103725,54077,40085,104415,38850,9278],["2018-12",76851,46205,30140,73809,28962,23154],["2019-01",79290,50018,32685,76590,42705,11474],["2019-02",86019,51423,35115,82022,35030,10549],["2019-03",101259,70452,41862,107474,58181,7910],["2019-04",128873,75412,52541,139784,62879,5678],["2019-05",142454,74079,48699,140289,64403,11098],["2019-06",113574,68707,50957,100402,42988,7191],["2019-07",107009,63963,48979,79517,30841,9722],["2019-08",134507,84022,55238,93375,30838,8918],["2019-09",100430,60323,43266,86015,23018,7769],["2019-10",140915,76416,62051,132231,38301,12351],["2019-11",108609,57675,43215,95689,34297,16155],["2019-12",80254,46227,34852,73888,33765,17762],["2020-01",84330,49461,35931,80133,42049,16540],["2020-02",42516,29234,17106,34499,29717,4274],["2020-03",38163,21422,13976,25181,33657,236],["2020-04",35018,19637,12444,22874,33225,null],["2020-05",64014,37408,22472,41529,36082,null],["2020-06",56104,33860,21884,36527,18542,474],["2020-07",69072,44430,30524,44443,28369,1706],["2020-08",89311,63137,35457,57215,25711,2570],["2020-09",49432,34853,15367,34814,13856,91],["2020-10",78902,52391,28101,61404,47147,1508],["2020-11",77150,49426,27363,68083,42784,4573],["2020-12",31424,23935,13054,30284,27815,1741],["2021-01",22416,16691,9607,21627,6843,1583],["2021-02",42358,28025,16934,39632,12730,2345],["2021-03",57071,37543,24352,49526,16888,1650],["2021-04",84989,52664,32717,64703,23745,2996],["2021-05",89379,56131,35130,66385,33659,3909],["2021-06",79202,52299,32946,57167,24690,4096],["2021-07",75976,51083,34007,52255,12724,6958],["2021-08",69364,50424,31354,47912,10305,5894],["2021-09",61695,40998,28496,45917,13891,3587],["2021-10",86377,58548,38233,74616,18944,5338],["2021-11",82484,54139,36915,74360,41527,5550],["2021-12",63180,39743,25572,55721,36742,4812],["2022-01",66349,51102,29630,67593,56327,6464],["2022-02",62838,49884,29458,62110,56151,5173],["2022-03",54341,42162,27740,49836,45986,2814],["2022-04",81245,55234,38534,77007,65919,3304],["2022-05",101880,66304,43301,106959,87288,7271],["2022-06",99765,63028,38919,101199,37356,7904],["2022-07",85625,56728,33616,69393,35643,5982],["2022-08",100322,66856,36891,75302,38811,6869],["2022-09",88710,56184,33888,81507,26577,4356],["2022-10",117223,75995,49565,112449,55176,5194],["2022-11",83224,55722,38326,82248,39456,6434],["2022-12",54220,40770,25265,null,11682,6659],["2023-01",59325,43393,22968,null,37475,5998],["2023-02",74214,51682,29276,null,51713,5314],["2023-03",78946,53302,38199,null,64611,4491],["2023-04",108046,62058,45102,null,45713,5137],["2023-05",112068,64963,44507,null,64300,5789],["2023-06",91492,59379,38841,null,31914,4671],["2023-07",75708,56869,35900,null,6918,1523],["2023-08",92116,65213,38173,null,30527,3105],["2023-09",85148,55370,37172,52469,38428,4486],["2023-10",110631,68637,43237,88405,52459,4959],["2023-11",69285,44553,30539,62203,45106,7926],["2023-12",50915,33631,20224,46081,24910,7525],["2024-01",57467,36074,23273,54394,36555,7167],["2024-02",54595,36005,24276,54487,24015,6247],["2024-03",75088,46022,32847,68455,43651,6223],["2024-04",95937,54204,41890,89081,49994,3803],["2024-05",113892,63869,45130,92002,52369,6604],["2024-06",77997,47303,33154,71027,40409,5504],["2024-07",80208,45496,32053,67041,7302,7471],["2024-08",86124,51797,32991,70441,23186,7751],["2024-09",89347,50935,32802,74334,15432,7277],["2024-10",93572,58391,42882,103595,29947,7528],["2024-11",68400,41240,28134,67206,28249,7187],["2024-12",49939,31419,22255,52839,51153,6969],["2025-01",51536,31443,21070,58482,43895,5689],["2025-02",41801,25287,16096,48030,43401,4884],["2025-03",57813,32776,24075,58436,59038,3633],["2025-04",87683,50334,33624,87497,64177,3720],["2025-05",96907,51491,33549,95770,65615,4707],["2025-06",76961,48497,31331,81547,53972,4342],["2025-07",70883,47562,27890,83490,17719,5063],["2025-08",78406,55430,29563,95690,27858,6191],["2025-09",74789,48846,29735,87402,30124,4754],["2025-10",104640,70019,47143,119116,40580,6624],["2025-11",78430,47474,32198,80308,44752,7537],["2025-12",59166,40619,20852,65283,38320,7263],["2026-01",59399,37292,20754,68071,37623,7032],["2026-02",53263,37803,20571,80539,36376,5274],["2026-03",61173,45213,28492,82917,53435,2834],["2026-04",85626,59206,37572,117186,40645,3676],["2026-05",99416,65000,37049,123136,66810,4567],["2026-06",76431,50728,29509,108971,38497,3731],["2026-07",77509,25563,49520,113490,28244,4274]]}<!--VISITORS:END--></script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const SKY = 0xbfe3dd;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 28, 75);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.45;
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(4, 10, 15);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 3;
+controls.maxDistance = 45;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.4;
+
+const sun = new THREE.DirectionalLight(0xfff0d0, 2.4);
+sun.position.set(10, 15, 9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 12, bottom: -12, near: 1, far: 50 });
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.02;
+scene.add(sun, new THREE.HemisphereLight(0xdff3ff, 0x6a8f6a, 0.6));
+
+// ───────── 지형: 제주도(동서로 긴 타원) + 한라산 + 오름 + 성산일출봉 + 우도 ─────────
+const A = 10, B = 5.2, SEA = -0.12;
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = rng(7);
+const oreums = [];
+while (oreums.length < 16) {
+  const x = (rand() * 2 - 1) * A * 0.8, z = (rand() * 2 - 1) * B * 0.8;
+  if ((x / A) ** 2 + (z / B) ** 2 < 0.55 && Math.hypot(x + 0.3, z) > 2.4)
+    oreums.push({ x, z, h: 0.18 + rand() * 0.22, s: 0.35 + rand() * 0.35 });
+}
+
+function height(x, z) {
+  const d = (x / A) ** 2 + (z / B) ** 2;
+  let h = SEA;
+  if (d < 1) {
+    const m = Math.sqrt(1 - d);
+    h += m * 0.62;
+    const px = x + 0.3;
+    h += 1.85 * Math.exp(-(px * px / (2 * 2.8 ** 2) + z * z / (2 * 1.9 ** 2))) * Math.min(1, m * 2);
+    h -= 0.3 * Math.exp(-(px * px + z * z) / 0.14);                    // 백록담
+    for (const o of oreums) h += o.h * Math.exp(-((x - o.x) ** 2 + (z - o.z) ** 2) / (2 * o.s * o.s)) * m;
+  }
+  const sx = x - 9.3, sz = z - 0.2, sr = sx * sx + sz * sz;           // 성산일출봉
+  h = Math.max(h, SEA + 0.9 * Math.exp(-sr / (2 * 0.3 ** 2)) - 0.2 * Math.exp(-sr / 0.015));
+  const ur = (x - 11.8) ** 2 + (z + 2.2) ** 2;                         // 우도
+  return Math.max(h, SEA + 0.5 * Math.exp(-ur / (2 * 0.55 ** 2)));
+}
+const isCanola = (x, z, y) => y > 0.08 && y < 0.45 && z > 0.5 && Math.sin(x * 1.3 + 1) * Math.cos(z * 1.9) > 0.6;
+
+const terrainGeo = new THREE.PlaneGeometry(34, 22, 230, 150);
+terrainGeo.rotateX(-Math.PI / 2);
+{
+  const p = terrainGeo.attributes.position, colors = new Float32Array(p.count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), y = height(x, z);
+    p.setY(i, y);
+    if (y < -0.05) c.set(0x3aa8b0);
+    else if (y < 0.06) c.set(0xe8d9a8);
+    else if (isCanola(x, z, y)) c.set(0xf3d33a);
+    else if (y < 0.95) c.set(0x6bb34f);
+    else if (y < 1.55) c.set(0x3f8a3f);
+    else c.set(0x8a7f72);
+    c.offsetHSL(0, 0, ((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1) * 0.02);
+    colors.set([c.r, c.g, c.b], i * 3);
+  }
+  terrainGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  terrainGeo.computeVertexNormals();
+}
+const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+terrain.castShadow = terrain.receiveShadow = true;
+scene.add(terrain);
+
+const seabed = new THREE.Mesh(new THREE.PlaneGeometry(240, 240),
+  new THREE.MeshStandardMaterial({ color: 0x3aa8b0, roughness: 1 }));
+seabed.rotation.x = -Math.PI / 2;
+seabed.position.y = SEA - 0.005;
+scene.add(seabed);
+
+// ───────── 바다 ─────────
+const oceanGeo = new THREE.PlaneGeometry(90, 90, 90, 90);
+oceanGeo.rotateX(-Math.PI / 2);
+const ocean = new THREE.Mesh(oceanGeo, new THREE.MeshStandardMaterial({
+  color: 0x1d9bc4, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.82
+}));
+ocean.receiveShadow = true;
+scene.add(ocean);
+const oceanBase = oceanGeo.attributes.position.array.slice();
+
+// ───────── 감귤나무(초록 수관 + 귤) ─────────
+const TREES = 160, ORANGES = TREES * 4;
+const treeMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color: 0x2f7d32, roughness: 0.9 }), TREES);
+const orangeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 10, 10),
+  new THREE.MeshStandardMaterial({ color: 0xff8c1a, roughness: 0.5 }), ORANGES);
+treeMesh.castShadow = true;
+{
+  const o = new THREE.Object3D(), dir = new THREE.Vector3();
+  let n = 0;
+  for (let tries = 0; n < TREES && tries < 6000; tries++) {
+    const x = (rand() * 2 - 1) * A, z = (rand() * 2 - 1) * B, y = height(x, z);
+    if (y < 0.1 || y > 0.8 || isCanola(x, z, y)) continue;
+    const s = 0.1 + rand() * 0.06;
+    o.position.set(x, y + s * 0.9, z); o.scale.setScalar(s); o.updateMatrix();
+    treeMesh.setMatrixAt(n, o.matrix);
+    for (let k = 0; k < 4; k++) {
+      dir.set(rand() - 0.5, rand() * 0.8 + 0.1, rand() - 0.5).normalize();
+      o.position.set(x + dir.x * s, y + s * 0.9 + dir.y * s, z + dir.z * s); o.scale.setScalar(1); o.updateMatrix();
+      orangeMesh.setMatrixAt(n * 4 + k, o.matrix);
+    }
+    n++;
+  }
+  treeMesh.count = n; orangeMesh.count = n * 4;
+}
+scene.add(treeMesh, orangeMesh);
+
+// ───────── 모델 헬퍼 ─────────
+const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, ...extra });
+const part = (geo, mat, x = 0, y = 0, z = 0) => {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; return m;
+};
+
+// 돌하르방
+function makeHareubang() {
+  const g = new THREE.Group(), stone = std(0x7b7b78, { roughness: 1 }), dark = std(0x222222);
+  g.add(part(new THREE.CylinderGeometry(0.08, 0.1, 0.26, 16), stone, 0, 0.13, 0));
+  g.add(part(new THREE.SphereGeometry(0.095, 20, 16), stone, 0, 0.34, 0));
+  g.add(part(new THREE.CylinderGeometry(0.075, 0.115, 0.07, 20), stone, 0, 0.44, 0));       // 벙거지
+  g.add(part(new THREE.SphereGeometry(0.014, 8, 8), dark, -0.035, 0.36, 0.085));
+  g.add(part(new THREE.SphereGeometry(0.014, 8, 8), dark, 0.035, 0.36, 0.085));
+  g.add(part(new THREE.SphereGeometry(0.022, 10, 10), stone, 0, 0.33, 0.1));                  // 코
+  g.add(part(new THREE.SphereGeometry(0.03, 10, 10), stone, -0.075, 0.2, 0.07));              // 손
+  g.add(part(new THREE.SphereGeometry(0.03, 10, 10), stone, 0.075, 0.17, 0.07));
+  g.scale.setScalar(1.8);
+  return g;
+}
+// 풍력발전기(한경 풍력단지)
+function makeTurbine(i) {
+  const g = new THREE.Group(), white = std(0xf4f6f8, { roughness: 0.4 });
+  g.add(part(new THREE.CylinderGeometry(0.025, 0.045, 1.2, 12), white, 0, 0.6, 0));
+  g.add(part(new THREE.BoxGeometry(0.06, 0.06, 0.12), white, 0, 1.22, 0));
+  const rotor = new THREE.Group(); rotor.name = 'rotor' + i; rotor.position.set(0, 1.22, 0.09);
+  for (let k = 0; k < 3; k++) {
+    const arm = new THREE.Group(); arm.rotation.z = k * Math.PI * 2 / 3;
+    arm.add(part(new THREE.BoxGeometry(0.035, 0.5, 0.008), white, 0, 0.25, 0));
+    rotor.add(arm);
+  }
+  rotor.add(part(new THREE.SphereGeometry(0.035, 12, 12), white));
+  g.add(rotor);
+  return g;
+}
+// 고깃배
+function makeBoat(hullColor) {
+  const g = new THREE.Group();
+  const hullGeo = new THREE.ConeGeometry(0.156, 0.25, 4); hullGeo.rotateY(Math.PI / 4); hullGeo.rotateX(Math.PI / 2);
+  g.add(part(new THREE.BoxGeometry(0.22, 0.08, 0.6), std(hullColor), 0, 0.04, 0));
+  g.add(part(hullGeo, std(hullColor), 0, 0.04, 0.42));
+  g.add(part(new THREE.BoxGeometry(0.16, 0.12, 0.18), std(0xffffff), 0, 0.14, -0.08));
+  g.add(part(new THREE.CylinderGeometry(0.01, 0.01, 0.3, 6), std(0x555555), 0, 0.3, 0.12));
+  g.add(part(new THREE.BoxGeometry(0.002, 0.08, 0.1), std(0xff4455), 0, 0.42, 0.07));
+  g.scale.setScalar(1.3);
+  return g;
+}
+// 비행기(제주공항 → 하늘)
+function makePlane() {
+  const g = new THREE.Group(), w = std(0xffffff, { roughness: 0.3 }), org = std(0xff7a1a);
+  const body = part(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 12), w); body.rotation.x = Math.PI / 2;
+  const nose = part(new THREE.ConeGeometry(0.04, 0.12, 12), w, 0, 0, 0.31); nose.rotation.x = Math.PI / 2;
+  g.add(body, nose);
+  g.add(part(new THREE.BoxGeometry(0.6, 0.012, 0.12), w, 0, -0.01, 0.02));
+  g.add(part(new THREE.BoxGeometry(0.2, 0.01, 0.07), w, 0, 0, -0.22));
+  g.add(part(new THREE.BoxGeometry(0.012, 0.12, 0.09), org, 0, 0.07, -0.22));
+  g.scale.setScalar(1.4);
+  return g;
+}
+
+// ───────── 배치 ─────────
+const labels = [];
+function addLabel(text, pos) {
+  const el = document.createElement('div'); el.className = 'label'; el.textContent = text;
+  const entry = { el, pos: new THREE.Vector3().copy(pos) };
+  document.body.appendChild(el); labels.push(entry);
+  return entry;
+}
+
+const hare = makeHareubang(); { const x = 6.5, z = 2.8; hare.position.set(x, height(x, z), z); }
+scene.add(hare);
+addLabel('돌하르방', hare.position.clone().add(new THREE.Vector3(0, 0.95, 0)));
+
+const turbines = [-7.6, -6.6, -5.6, -4.6, -3.6].map((x, i) => {
+  const t = makeTurbine(i), z = -B * Math.sqrt(1 - (x / A) ** 2) * 0.82;
+  t.position.set(x, height(x, z), z); t.rotation.y = -0.4; scene.add(t); return t;
+});
+addLabel('한경 풍력단지', turbines[2].position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+addLabel('한라산 1,947m', new THREE.Vector3(-0.3, 2.6, 0));
+addLabel('성산일출봉', new THREE.Vector3(9.3, 1.1, 0.2));
+addLabel('우도', new THREE.Vector3(11.8, 0.7, -2.2));
+
+const boats = [makeBoat(0x2f6fd6), makeBoat(0xe8453c)];
+boats[0].name = 'boat0'; boats[1].name = 'boat1';
+const plane = makePlane(); plane.name = 'plane0';
+scene.add(...boats, plane);
+
+// 구름
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.92 });
+const clouds = Array.from({ length: 8 }, () => {
+  const g = new THREE.Group();
+  for (let k = 0; k < 5; k++) {
+    const s = 0.5 + rand() * 0.5;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(s, 16, 12), cloudMat);
+    m.position.set((k - 2) * 0.7, rand() * 0.25, (rand() - 0.5) * 0.6); m.scale.y = 0.6; g.add(m);
+  }
+  g.position.set((rand() * 2 - 1) * 24, 4.5 + rand() * 2, (rand() * 2 - 1) * 14);
+  g.userData.speed = 0.3 + rand() * 0.4;
+  scene.add(g); return g;
+});
+
+// ───────── 서귀포 직영관광지 관람객 (공공데이터포털) → 3D 기둥 ─────────
+// 데이터 앞뒤의 <!--VISITORS:BEGIN/END--> 표시는 제거하고 읽음. 행 형식: [연월, 천지연, 정방, ...] (spots 순서)
+const VD = (() => {
+  try { return JSON.parse(document.getElementById('visitor-data').textContent.replace(/<!--[\s\S]*?-->/g, '')); } catch (e) { console.warn('관람객 데이터를 읽지 못했어요', e); return null; }
+})();
+const man = n => (n >= 10000 ? (n / 10000).toFixed(1) + '만' : Math.round(n).toLocaleString('ko-KR'));
+const ymText = ym => `${ym.slice(0, 4)}년 ${+ym.slice(5)}월`;
+const pillars = [];
+const V = { idx: 0, playing: false, acc: 0, max: 1, maxTotal: 1, speed: 1 };
+// 관광지 위치: 서귀포 남쪽 해안을 따라 서→동. k = 해안선에서 안쪽으로 들어간 정도(1=해안)
+const SPOTS = {
+  '산방산_용머리':       { name: '산방산·용머리',   x: -6.3, k: 0.84, c: 0xa0693a },
+  '중문대포 주상절리대': { name: '주상절리대',       x: -3.9, k: 0.9,  c: 0x868e96 },
+  '천제연폭포':          { name: '천제연폭포',       x: -3.1, k: 0.66, c: 0x2f9e44 },
+  '천지연폭포':          { name: '천지연폭포',       x: -0.3, k: 0.86, c: 0x0e7c86 },
+  '정방폭포':            { name: '정방폭포',         x: 0.9,  k: 0.9,  c: 0x3b82c4 },
+  '감귤박물관':          { name: '감귤박물관',       x: 3.0,  k: 0.74, c: 0xff8a1f },
+};
+if (VD && VD.rows && VD.rows.length) {
+  V.idx = VD.rows.length - 1;
+  V.max = Math.max(...VD.rows.flatMap(r => r.slice(1).filter(x => x != null)));
+  V.maxTotal = Math.max(...VD.rows.map(r => r.slice(1).reduce((a, b) => a + (b || 0), 0)));
+  const pillarGeo = new THREE.CylinderGeometry(0.17, 0.2, 1, 24); pillarGeo.translate(0, 0.5, 0);
+  VD.spots.forEach((key, i) => {
+    const S = SPOTS[key]; if (!S) return;
+    const z = B * Math.sqrt(1 - (S.x / A) ** 2) * S.k, y = Math.max(height(S.x, z), 0);
+    const mat = new THREE.MeshStandardMaterial({ color: S.c, emissive: S.c, emissiveIntensity: 0.4, roughness: 0.35, transparent: true, opacity: 0.93 });
+    const mesh = new THREE.Mesh(pillarGeo, mat); mesh.position.set(S.x, y, z); mesh.scale.y = 0.02; mesh.castShadow = true;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.4, 36), new THREE.MeshBasicMaterial({ color: S.c, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(S.x, y + 0.03, z);
+    const lab = addLabel('', new THREE.Vector3(S.x, y + 0.5, z)); lab.el.classList.add('v'); lab.el.style.setProperty('--c', '#' + new THREE.Color(S.c).getHexString());
+    scene.add(mesh, ring);
+    pillars.push({ col: i + 1, name: S.name, x: S.x, y, z, mesh, ring, lab, h: 0.02, lift: (pillars.length % 2) * 0.28 });
+  });
+
+  const slider = document.getElementById('vslider'), play = document.getElementById('vplay');
+  slider.max = VD.rows.length - 1; slider.value = V.idx;
+  slider.addEventListener('input', () => { V.idx = +slider.value; V.playing = false; play.textContent = '▶'; });
+  play.addEventListener('click', () => {
+    V.playing = !V.playing; play.textContent = V.playing ? '⏸' : '▶';
+    if (V.playing && V.idx >= VD.rows.length - 1) V.idx = 0;
+  });
+}
+function updateVisitors(dt) {
+  if (!pillars.length) return;
+  if (V.playing) { V.acc += dt; if (V.acc > 0.45) { V.acc = 0; V.idx++; if (V.idx >= VD.rows.length) { V.idx = VD.rows.length - 1; V.playing = false; document.getElementById('vplay').textContent = '▶'; } document.getElementById('vslider').value = V.idx; } }
+  const row = VD.rows[V.idx];
+  let total = 0;
+  for (const p of pillars) {
+    const val = row[p.col]; if (val != null) total += val;
+    const target = val == null ? 0.03 : Math.max(0.05, val / V.max * 3.2);
+    p.h += (target - p.h) * Math.min(1, dt * 6);
+    p.mesh.scale.y = p.h;
+    p.lab.pos.set(p.x, p.y + p.h + 0.32 + p.lift, p.z);
+    p.lab.el.textContent = `${p.name} ${val == null ? '미집계' : man(val)}`;
+    p.ring.scale.setScalar(1 + 0.12 * Math.sin(performance.now() / 400 + p.col));
+  }
+  document.getElementById('vmonth').textContent = ymText(row[0]);
+  document.getElementById('vtotal').textContent = `합계 ${man(total)}명`;
+  // 관광객이 많은 달일수록 배·비행기가 바빠짐 (애니메이션 재생 속도에 연동)
+  V.speed += ((0.55 + 1.15 * total / V.maxTotal) - V.speed) * Math.min(1, dt * 3);
+  for (const k of ['boat0', 'boat1', 'plane0']) if (actions[k]) actions[k].timeScale = V.speed;
+}
+
+// ───────── 키프레임 애니메이션 (AnimationMixer) ─────────
+const mixer = new THREE.AnimationMixer(scene);
+const dummy = new THREE.Object3D();
+
+function pathClip(name, pts, duration, bank = 0) {
+  const N = pts.length - 1;                           // 마지막 점 = 첫 점 (폐곡선)
+  const times = [], pv = [], qv = [];
+  let prev = null;
+  for (let i = 0; i <= N; i++) {
+    dummy.position.copy(pts[i]); dummy.rotation.set(0, 0, 0); dummy.quaternion.identity();
+    dummy.updateMatrixWorld(true);
+    dummy.lookAt(pts[(i + 1) % N]);
+    if (bank) dummy.rotateZ(bank);
+    const q = dummy.quaternion.clone();
+    if (prev && q.dot(prev) < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+    prev = q;
+    times.push(i * duration / N);
+    pv.push(pts[i].x, pts[i].y, pts[i].z);
+    qv.push(q.x, q.y, q.z, q.w);
+  }
+  return new THREE.AnimationClip(name, duration, [
+    new THREE.VectorKeyframeTrack(`${name}.position`, times, pv),
+    new THREE.QuaternionKeyframeTrack(`${name}.quaternion`, times, qv),
+  ]);
+}
+function ellipse(rx, rz, n, yFn, dir = 1) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = dir * i / n * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * rx, yFn(i), Math.sin(a) * rz));
+  }
+  pts.push(pts[0].clone());
+  return pts;
+}
+
+const clips = [
+  pathClip('boat0', ellipse(12.5, 7.2, 48, i => 0.03 + 0.02 * Math.sin(i * 1.3)), 70),
+  pathClip('boat1', ellipse(14.8, 8.6, 56, i => 0.03 + 0.02 * Math.sin(i * 1.7), -1), 95),
+  pathClip('plane0', ellipse(13, 7.5, 40, i => 3.4 + 0.25 * Math.sin(i * 0.5)), 32, 0.35),
+];
+turbines.forEach((_, i) => {
+  const q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI * 2 / 3);
+  clips.push(new THREE.AnimationClip(`rotor${i}`, 2 + i * 0.25, [
+    new THREE.QuaternionKeyframeTrack(`rotor${i}.quaternion`, [0, 2 + i * 0.25], [...q0.toArray(), ...q1.toArray()]),
+  ]));
+});
+// 돌하르방이 살짝 고개를 끄덕이는 키프레임
+hare.name = 'hare';
+{
+  const e = (x) => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, 0, 0)).toArray();
+  clips.push(new THREE.AnimationClip('hare', 3, [
+    new THREE.QuaternionKeyframeTrack('hare.quaternion', [0, 1.5, 3], [...e(0), ...e(0.06), ...e(0)]),
+  ]));
+}
+const actions = {};
+clips.forEach(c => { const a = mixer.clipAction(c); a.play(); actions[c.name] = a; });
+
+// ───────── 렌더 루프 ─────────
+const clock = new THREE.Clock(false);
+const v = new THREE.Vector3();
+function updateLabels() {
+  for (const { el, pos } of labels) {
+    v.copy(pos).project(camera);
+    el.style.display = v.z > 1 ? 'none' : '';
+    el.style.transform = `translate(${(v.x * 0.5 + 0.5) * innerWidth}px, ${(-v.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -100%)`;
+  }
+}
+const op = oceanGeo.attributes.position;
+function animate() {
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  updateVisitors(dt);
+  mixer.update(dt);
+  for (const c of clouds) { c.position.x += dt * c.userData.speed; if (c.position.x > 26) c.position.x = -26; }
+  for (let i = 0; i < op.count; i++) {
+    const x = oceanBase[i * 3], z = oceanBase[i * 3 + 2];
+    op.setY(i, Math.sin(x * 0.6 + t * 1.2) * 0.02 + Math.cos(z * 0.5 + t * 0.9) * 0.02);
+  }
+  op.needsUpdate = true; oceanGeo.computeVertexNormals();
+  controls.update();
+  updateLabels();
+  renderer.render(scene, camera);
+}
+
+// 시작 화면: 버튼을 누르면 애니메이션 실행
+mixer.update(0);
+renderer.render(scene, camera);
+updateLabels();
+document.getElementById('start').addEventListener('click', () => {
+  document.getElementById('intro').remove();
+  if (pillars.length) document.getElementById('vpanel').classList.remove('hidden');
+  clock.start();
+  renderer.setAnimationLoop(animate);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
